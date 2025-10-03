@@ -1,5 +1,3 @@
-# managerialecon.github.io
-Games for Managerial Economics, UCLA Anderson's School of Management 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,7 +54,7 @@ Games for Managerial Economics, UCLA Anderson's School of Management
       <article class="card">
         <div class="hd">
           <span>First‑Price Auction</span>
-          <span class="pill">game1.htm</span>
+          <span class="pill">game1.html</span>
         </div>
         <div class="bd">
           Bid against a simulated opponent in a first‑price sealed‑bid auction. Track wins and earnings.
