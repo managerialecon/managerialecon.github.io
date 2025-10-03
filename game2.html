@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pricing Experiment — Econ-Simulator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --card: #1f2937;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1000px 600px at 10% -10%, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh; display: grid; place-items: start center; padding: 32px 16px 64px;
+    }
+    .container { width: min(1100px, 100%); }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: .3px; }
+    .subtitle { color: var(--muted); margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .card .hd { padding: 16px 18px; border-bottom: 1px solid var(--border); font-weight: 700; }
+    .card .bd { padding: 16px 18px; }
+    .controls { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    label { font-size: 13px; color: var(--muted); }
+    input[type="number"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 16px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    button { cursor: pointer; border: 1px solid var(--border); background: #0b1220; color: var(--text); padding: 12px 14px; border-radius: 12px; font-weight: 600; font-size: 15px; transition: transform .03s ease, box-shadow .2s ease; }
+    button.primary { background: linear-gradient(180deg, #16a34a, #059669); border-color: #047857; }
+    button:hover { box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+    button:active { transform: translateY(1px); }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
+    .stat .k { color: var(--muted); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
+    .stat .v { margin-top: 6px; font-size: 20px; font-weight: 800; }
+    .footer { display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { text-align: left; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border); padding: 10px 8px; }
+    tbody td { border-bottom: 1px dashed #223047; padding: 10px 8px; }
+    tbody tr:last-child td { border-bottom: none; }
+    .note { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pricing Experiment — Econ-Simulator</h1>
+    <div class="subtitle">Demand: <b>P = 400 − 0.25·Q</b>. Marginal cost = <b>$0</b>. Development cost = <b>$50,000</b>.</div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">Try a Price</div>
+        <div class="bd">
+          <div class="controls">
+            <div>
+              <label for="price">Price (0–400)</label>
+              <input id="price" type="number" inputmode="decimal" step="1" min="0" max="400" placeholder="e.g., 200" />
+              <input id="price-slider" type="range" min="0" max="40000" step="1" />
+            </div>
+            <div>
+              <button id="submit" class="primary">Set Price for this Attempt</button>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="k">Attempts</div><div id="s-rounds" class="v">0</div></div>
+            <div class="stat"><div class="k">Average Price</div><div id="s-avgprice" class="v">$0</div></div>
+            <div class="stat"><div class="k">Average Profits</div><div id="s-avg" class="v">$0</div></div>
+          </div>
+
+          <div class="footer">
+            <button id="undo">Undo last attempt</button>
+            <button id="reset">Reset</button>
+            <span class="tiny">Tip: press <b>Enter</b> to submit. Demand implies Q = max(0, 1600 − 4P).</span>
+          </div>
+          <p class="note">This exercise is for Managerial Economics at UCLA Anderson's School of Management.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd">Attempt Log</div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Revenue</th>
+                <th>Cost (var.+fixed)</th>
+                <th>Profit</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const FIXED = 50000;      
+    const P_MAX = 400;        
+
+    const priceInput = document.getElementById('price');
+    const priceSlider = document.getElementById('price-slider');
+    const tbody = document.getElementById('tbody');
+
+    const sRounds = document.getElementById('s-rounds');
+    const sAvgPrice = document.getElementById('s-avgprice');
+    const sAvg = document.getElementById('s-avg');
+
+    let rounds = [];
+
+    const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+    const money = (x) => {
+      const sign = x < 0 ? '-' : '';
+      const v = Math.abs(x).toLocaleString(undefined, {maximumFractionDigits:0});
+      return `${sign}$${v}`;
+    };
+
+    function Q_from_P(P) { return Math.max(0, 1600 - 4 * P); }
+
+    function setFromSlider(val) {
+      const P = Number(val) / 100; 
+      priceInput.value = clamp(P, 0, P_MAX).toFixed(0);
+    }
+    function setFromInput(val) {
+      const P = clamp(Number(val), 0, P_MAX);
+      priceSlider.value = Math.round(P * 100);
+      priceInput.value = P.toFixed(0);
+    }
+    priceSlider.addEventListener('input', (e) => setFromSlider(e.target.value));
+    priceInput.addEventListener('input', (e) => setFromInput(e.target.value));
+    setFromInput(200);
+
+    function playRound(withPrice) {
+      const P = clamp(Number(withPrice), 0, P_MAX);
+      const Q = Q_from_P(P);
+      const R = P * Q;
+      const C = FIXED;              
+      const Pi = R - C;         
+      const row = { n: rounds.length + 1, P, Q, R, C, Pi };
+      rounds.push(row);
+      render();
+    }
+
+    function undo() { rounds.pop(); render(); }
+    function resetAll() { rounds = []; render(); }
+
+    function render() {
+      const n = rounds.length;
+      const avgProf = n ? Math.round(rounds.reduce((a, r) => a + r.Pi, 0) / n) : 0;
+      const avgPrice = n ? Math.round(rounds.reduce((a, r) => a + r.P, 0) / n) : 0;
+
+      sRounds.textContent = n;
+      sAvg.textContent = money(avgProf);
+      sAvgPrice.textContent = money(avgPrice);
+
+      tbody.innerHTML = '';
+      for (const r of rounds) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.n}</td>
+          <td>${money(r.P)}</td>
+          <td>${Math.round(r.Q).toLocaleString()}</td>
+          <td>${money(Math.round(r.R))}</td>
+          <td>${money(r.C)}</td>
+          <td>${money(Math.round(r.Pi))}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    document.getElementById('submit').addEventListener('click', () => playRound(priceInput.value));
+    document.getElementById('undo').addEventListener('click', undo);
+    document.getElementById('reset').addEventListener('click', resetAll);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Enter') playRound(priceInput.value); });
+
+    render();
+  </script>
+</body>
+</html>
