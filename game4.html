@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Game 4 — Repeated Prisoner’s Dilemma (10 rounds)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --card: #1f2937;
+      --border: #334155;
+      --pill: #0b1220;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1000px 600px at 10% -10%,#1e293b 0%,var(--bg) 60%);color:var(--text);min-height:100vh;display:grid;place-items:start center;padding:32px 16px 64px}
+    .container{width:min(1100px,100%)}
+    h1{margin:0 0 8px;font-size:clamp(26px,2.6vw,36px);letter-spacing:.3px}
+    .subtitle{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card .hd{padding:16px 18px;border-bottom:1px solid var(--border);font-weight:700}
+    .card .bd{padding:16px 18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--pill);padding:8px 12px;border-radius:999px}
+    .persona{border:1px solid var(--border);background:var(--pill);color:var(--text);padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+    .persona.active{outline:2px solid var(--accent);}
+    .actions{display:flex;gap:10px;margin-top:10px}
+    button{cursor:pointer;border:1px solid var(--border);background:var(--pill);color:var(--text);padding:12px 14px;border-radius:12px;font-weight:700}
+    button.primary{background:linear-gradient(180deg,#16a34a,#059669);border-color:#047857}
+    button.warn{background:linear-gradient(180deg,#ef4444,#b91c1c);border-color:#7f1d1d}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+    .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+    .stat .k{color:var(--muted);font-size:12px;letter-spacing:.4px;text-transform:uppercase}
+    .stat .v{margin-top:6px;font-size:20px;font-weight:800}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead th{text-align:left;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);padding:10px 8px}
+    tbody td{border-bottom:1px dashed #223047;padding:10px 8px}
+    tbody tr:last-child td{border-bottom:none}
+    .note{font-size:14px;color:var(--muted);margin-top:8px}
+    .good{color:var(--accent);font-weight:800}
+    .bad{color:var(--danger);font-weight:800}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Repeated Prisoner’s Dilemma — 10 Rounds</h1>
+    <div class="subtitle">Payoffs per round (You, Opponent):<span class="pill">KK → (−1, −1)</span> <span class="pill">K/S → (−3, 0)</span> <span class="pill">S/K → (0, −3)</span> <span class="pill">SS → (−2, −2)</span></div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">Pick an Opponent</div>
+        <div class="bd">
+          <div class="row">
+            <button class="persona active" id="p-nico">Nico</button>
+            <button class="persona" id="p-lucas">Lucas</button>
+            <button class="persona" id="p-alma">Alma</button>
+          </div>
+          <p id="persona-text" class="note" style="margin-top:10px">Nico is very selfish and short-sighted. He'll do whatever maximizes his payoff in each round.</p>
+
+          <div class="actions">
+            <button id="a-quiet" class="primary">Keep Quiet</button>
+            <button id="a-snitch" class="warn">Snitch</button>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div id="s-round" class="v">1 / 10</div></div>
+            <div class="stat"><div class="k">Your Avg</div><div id="s-you-avg" class="v">0.00</div></div>
+            <div class="stat"><div class="k">Everyone Avg</div><div id="s-all-avg" class="v">0.00</div></div>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <button id="undo">Undo last round</button>
+            <button id="reset">Reset</button>
+          </div>
+          <p class="note">This exercise is for Managerial Economics at UCLA Anderson's School of Management.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd">Round Log</div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>You</th>
+                <th>Opponent</th>
+                <th>Your payoff</th>
+                <th>Opponent payoff</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const PAY = [
+      [ [-1, -1], [-3, 0] ],
+      [ [0, -3],  [-2, -2] ]
+    ];
+    const MAX_ROUNDS = 10;
+    const PERSONAS = {
+      nico: { name: 'Nico', text: "Nico is very selfish and short-sighted. He'll do whatever maximizes his payoff in each round.", policy: (history)=>1 },
+      lucas: { name: 'Lucas', text: 'Lucas is a nice guy all around. He is trustworthy and altruistic.', policy: (history)=>0 },
+      alma:  { name: 'Alma',  text: "An eye for an eye. If you snitch, I'll get revenge. But if you play nice, I'll be nice too.", policy: (history)=> history.length===0 ? 0 : history[history.length-1].you }
+    };
+
+    let persona = 'nico';
+    const pNico = document.getElementById('p-nico');
+    const pLucas = document.getElementById('p-lucas');
+    const pAlma = document.getElementById('p-alma');
+    const personaText = document.getElementById('persona-text');
+
+    const btnQuiet = document.getElementById('a-quiet');
+    const btnSnitch = document.getElementById('a-snitch');
+    const btnUndo = document.getElementById('undo');
+    const btnReset = document.getElementById('reset');
+
+    const sRound = document.getElementById('s-round');
+    const sYouAvg = document.getElementById('s-you-avg');
+    const sAllAvg = document.getElementById('s-all-avg');
+
+    const tbody = document.getElementById('tbody');
+
+    let rounds = [];
+
+    function setPersona(key){
+      persona = key;
+      [pNico,pLucas,pAlma].forEach(el=>el.classList.remove('active'));
+      if(key==='nico') pNico.classList.add('active');
+      if(key==='lucas') pLucas.classList.add('active');
+      if(key==='alma') pAlma.classList.add('active');
+      personaText.textContent = PERSONAS[key].text;
+      rounds = [];
+      render();
+    }
+
+    pNico.addEventListener('click',()=>setPersona('nico'));
+    pLucas.addEventListener('click',()=>setPersona('lucas'));
+    pAlma.addEventListener('click',()=>setPersona('alma'));
+
+    function act(yourMove){
+      if(rounds.length >= MAX_ROUNDS) return;
+      const oppMove = PERSONAS[persona].policy(rounds);
+      const [py, po] = PAY[yourMove][oppMove];
+      rounds.push({ round: rounds.length+1, you: yourMove, opp: oppMove, payYou: py, payOpp: po });
+      render();
+    }
+
+    btnQuiet.addEventListener('click',()=>act(0));
+    btnSnitch.addEventListener('click',()=>act(1));
+    btnUndo.addEventListener('click',()=>{ rounds.pop(); render(); });
+    btnReset.addEventListener('click',()=>{ rounds = []; render(); });
+
+    function render(){
+      const n = rounds.length;
+      sRound.textContent = `${Math.min(n+1,MAX_ROUNDS)} / ${MAX_ROUNDS}`;
+
+      const sumYou = rounds.reduce((a,r)=>a+r.payYou,0);
+      const sumAll = rounds.reduce((a,r)=>a+r.payYou+r.payOpp,0);
+      const avgYou = n? sumYou/n : 0;
+      const avgAll = n? sumAll/n : 0;
+
+      sYouAvg.textContent = avgYou.toFixed(2);
+      sAllAvg.textContent = avgAll.toFixed(2);
+
+      const done = n>=MAX_ROUNDS;
+      btnQuiet.disabled = done;
+      btnSnitch.disabled = done;
+
+      tbody.innerHTML = '';
+      for(const r of rounds){
+        const tr = document.createElement('tr');
+        const youTxt = r.you===0?'Keep Quiet':'Snitch';
+        const oppTxt = r.opp===0?'Keep Quiet':'Snitch';
+        tr.innerHTML = `<td>${r.round}</td><td>${youTxt}</td><td>${oppTxt}</td><td class="${r.payYou>r.payOpp?'good':''} ${r.payYou<r.payOpp?'bad':''}">${r.payYou.toFixed(0)}</td><td>${r.payOpp.toFixed(0)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+    render();
+  </script>
+</body>
+</html>
