@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Second-Price Sealed-Bid Auction — Practice Game</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --card: #1f2937;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1000px 600px at 10% -10%, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid; place-items: start center; padding: 32px 16px 64px;
+    }
+    .container { width: min(1100px, 100%); }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: .3px; }
+    .subtitle { color: var(--muted); margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .card .hd { padding: 16px 18px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .2px; }
+    .card .bd { padding: 16px 18px; }
+    .note { font-size: 14px; color: var(--muted); }
+    .controls { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+    label { font-size: 13px; color: var(--muted); }
+    input[type="number"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 16px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    button { cursor: pointer; border: 1px solid var(--border); background: #0b1220; color: var(--text); padding: 12px 14px; border-radius: 12px; font-weight: 600; font-size: 15px; transition: transform .03s ease, box-shadow .2s ease; }
+    button.primary { background: linear-gradient(180deg, #16a34a, #059669); border-color: #047857; }
+    button:hover { box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
+    .stat .k { color: var(--muted); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
+    .stat .v { margin-top: 6px; font-size: 20px; font-weight: 800; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { text-align: left; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border); padding: 10px 8px; }
+    tbody td { border-bottom: 1px dashed #223047; padding: 10px 8px; }
+    tbody tr:last-child td { border-bottom: none; }
+    .win { color: var(--accent); font-weight: 700; }
+    .lose { color: var(--danger); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Second‑Price Sealed‑Bid Auction — Practice Game</h1>
+    <div class="subtitle">Your private value is <b>$100</b>. You bid against <b>3</b> bots; each bot’s bid is drawn i.i.d. from <b>Uniform($50,$120)</b> each round. If you win, you pay the <b>second‑highest</b> bid (i.e., the highest competing bid) and earn <b>$100 − price</b>; otherwise you earn <b>$0</b>. Ties at the top are broken at random.</div>
+    <div class="grid">
+      <section class="card">
+        <div class="hd">Play</div>
+        <div class="bd">
+          <div class="controls">
+            <label for="bid">Your bid ($0–$200 suggested)</label>
+            <input id="bid" type="number" step="0.01" min="0" max="200" placeholder="e.g., 100.00" />
+            <input id="bid-slider" type="range" min="0" max="20000" step="1" />
+            <button id="submit" class="primary">Submit Bid</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div id="s-rounds" class="v">0</div></div>
+            <div class="stat"><div class="k">Wins</div><div id="s-wins" class="v">0</div></div>
+            <div class="stat"><div class="k">Total Earnings</div><div id="s-total" class="v">$0.00</div></div>
+            <div class="stat"><div class="k">Average per Round</div><div id="s-avg" class="v">$0.00</div></div>
+          </div>
+          <p class="note">This exercise is for Managerial Economics at UCLA Anderson's School of Management.</p>
+        </div>
+      </section>
+      <section class="card">
+        <div class="hd">Round Log</div>
+        <div class="bd">
+          <table>
+            <thead><tr><th>#</th><th>Your bid</th><th>Highest bot bid</th><th>Price paid</th><th>Outcome</th><th>Earnings</th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    const VALUE = 100, NUM_BOTS = 3, BOT_MIN = 50, BOT_MAX = 120;
+    const bidInput = document.getElementById('bid'), bidSlider = document.getElementById('bid-slider'),
+          tbody = document.getElementById('tbody'), sRounds = document.getElementById('s-rounds'),
+          sWins = document.getElementById('s-wins'), sTotal = document.getElementById('s-total'),
+          sAvg = document.getElementById('s-avg');
+    let rounds = [];
+    const clamp = (x,lo,hi)=>Math.min(hi,Math.max(lo,x));
+    const money = (x)=>`$${x.toFixed(2)}`;
+    const rndBotBid = ()=>BOT_MIN+(BOT_MAX-BOT_MIN)*Math.random();
+    function setFromSlider(v){const b=(Number(v)/20000)*200;bidInput.value=b.toFixed(2);}
+    function setFromInput(v){const b=clamp(Number(v),0,200);bidSlider.value=Math.round((b/200)*20000);bidInput.value=b.toFixed(2);}
+    bidSlider.addEventListener('input',e=>setFromSlider(e.target.value));
+    bidInput.addEventListener('input',e=>setFromInput(e.target.value));
+    setFromInput(100);
+    function playOneRound(v){const myBid=clamp(Number(v),0,200),bots=Array.from({length:NUM_BOTS},()=>rndBotBid()),maxBot=Math.max(...bots),maxAll=Math.max(maxBot,myBid);
+      const botMaxCount=bots.filter(b=>Math.abs(b-maxAll)<1e-9).length,playerAtMax=Math.abs(myBid-maxAll)<1e-9?1:0,winners=botMaxCount+playerAtMax;
+      let win=false;if(Math.abs(myBid-maxAll)<1e-9){win=Math.random()<1/winners;}
+      let price=0;if(win){if(myBid>maxBot)price=maxBot;else price=maxAll;}
+      const earn=win?(VALUE-price):0;
+      rounds.push({n:rounds.length+1,myBid,maxBot,price,win,earn});render();}
+    function render(){const n=rounds.length,wins=rounds.filter(r=>r.win).length,total=rounds.reduce((a,r)=>a+r.earn,0),avg=n?total/n:0;
+      sRounds.textContent=n;sWins.textContent=wins;sTotal.textContent=money(total);sAvg.textContent=money(avg);
+      tbody.innerHTML='';for(const r of rounds){const tr=document.createElement('tr');tr.innerHTML=`<td>${r.n}</td><td>${money(r.myBid)}</td><td>${money(r.maxBot)}</td><td>${money(r.price)}</td><td class="${r.win?'win':'lose'}">${r.win?'Win':'Lose'}</td><td>${money(r.earn)}</td>`;tbody.appendChild(tr);}}
+    document.getElementById('submit').addEventListener('click',()=>playOneRound(bidInput.value));
+    window.addEventListener('keydown',e=>{if(e.key==='Enter')playOneRound(bidInput.value);});
+    render();
+  </script>
+</body>
+</html>
