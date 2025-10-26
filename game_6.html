@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dutch Auction — Clock Game</title>
+  <style>
+    :root{
+      --bg:#0f172a;--text:#e5e7eb;--muted:#9ca3af;--accent:#22c55e;--danger:#ef4444;--card:#1f2937;--border:#334155;--pill:#0b1220
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1000px 600px at 10% -10%,#1e293b 0%,var(--bg) 60%);color:var(--text);min-height:100vh;display:grid;place-items:start center;padding:32px 16px 64px}
+    .container{width:min(1100px,100%)}
+    h1{margin:0 0 8px;font-size:clamp(26px,2.6vw,36px)}
+    .subtitle{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card .hd{padding:16px 18px;border-bottom:1px solid var(--border);font-weight:800}
+    .card .bd{padding:16px 18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    button{cursor:pointer;border:1px solid var(--border);background:var(--pill);color:var(--text);padding:12px 14px;border-radius:12px;font-weight:700}
+    button.primary{background:linear-gradient(180deg,#16a34a,#059669);border-color:#047857}
+    button.warn{background:linear-gradient(180deg,#ef4444,#b91c1c);border-color:#7f1d1d}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+    .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+    .stat .k{color:var(--muted);font-size:12px;letter-spacing:.4px;text-transform:uppercase}
+    .stat .v{margin-top:6px;font-size:20px;font-weight:800}
+    .clock{display:grid;place-items:center;gap:10px;margin-top:10px}
+    .big{font-size:48px;font-weight:900;letter-spacing:.5px}
+    .bar{height:10px;background:#0b1220;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;background:linear-gradient(90deg,#06b6d4,#22c55e)}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead th{text-align:left;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);padding:10px 8px}
+    tbody td{border-bottom:1px dashed #223047;padding:10px 8px}
+    tbody tr:last-child td{border-bottom:none}
+    .note{font-size:14px;color:var(--muted);margin-top:8px}
+    .win{color:var(--accent);font-weight:800}
+    .lose{color:var(--danger);font-weight:800}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Dutch Auction — Clock Game</h1>
+    <div class="subtitle">Clock starts at <b>$100</b> and ticks down <b>$1</b> every 0.1 seconds. Your value is <b>$80</b>. You are playing against a bot that draws a random number <b>U[0,100]</b> each round and bids exactly when the clock hits that price. If you bid first, you win and pay that price; if the bot bids first, it wins.</div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">Play</div>
+        <div class="bd">
+          <div class="row">
+            <button id="start" class="primary">Start round</button>
+            <button id="bid" class="warn" disabled>Bid now</button>
+            <button id="stop" disabled>Pause</button>
+            <button id="reset">Reset log</button>
+          </div>
+
+          <div class="clock">
+            <div class="big" id="price">$100</div>
+            <div class="bar"><div id="barfill" style="width:100%"></div></div>
+            <div class="row"><span class="pill">Bot’s (hidden) bid is drawn uniformly between $0 and $100</span></div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div id="s-rounds" class="v">0</div></div>
+            <div class="stat"><div class="k">Wins</div><div id="s-wins" class="v">0</div></div>
+            <div class="stat"><div class="k">Total Earnings</div><div id="s-total" class="v">$0</div></div>
+            <div class="stat"><div class="k">Average per Round</div><div id="s-avg" class="v">$0</div></div>
+          </div>
+          <p class="note">This exercise is for Managerial Economics at UCLA Anderson's School of Management.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd">Round Log</div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Your bid</th>
+                <th>Bot bid</th>
+                <th>Winner</th>
+                <th>Price paid</th>
+                <th>Your earnings</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const START_PRICE = 100;
+    const VALUE = 80;
+
+    const priceEl = document.getElementById('price');
+    const barEl = document.getElementById('barfill');
+    const btnStart = document.getElementById('start');
+    const btnBid = document.getElementById('bid');
+    const btnStop = document.getElementById('stop');
+    const btnReset = document.getElementById('reset');
+    const tbody = document.getElementById('tbody');
+    const sRounds = document.getElementById('s-rounds');
+    const sWins = document.getElementById('s-wins');
+    const sTotal = document.getElementById('s-total');
+    const sAvg = document.getElementById('s-avg');
+
+    let timer = null;
+    let price = START_PRICE;
+    let running = false;
+    let botThreshold = null;
+    let rounds = [];
+
+    const money0 = (x)=>`$${Math.round(x)}`;
+
+    function resetClock(){
+      price = START_PRICE;
+      botThreshold = Math.floor(Math.random()*101);
+      updateClock();
+    }
+
+    function updateClock(){
+      priceEl.textContent = money0(price);
+      barEl.style.width = `${(price/START_PRICE)*100}%`;
+    }
+
+    function start(){
+      if(running) return;
+      resetClock();
+      running = true;
+      btnBid.disabled = false;
+      btnStop.disabled = false;
+      btnStart.disabled = true;
+      timer = setInterval(tick, 100);
+    }
+
+    function stop(){
+      if(timer){ clearInterval(timer); timer = null; }
+      running = false;
+      btnBid.disabled = true;
+      btnStop.disabled = true;
+      btnStart.disabled = false;
+    }
+
+    function finishRound(winner, myBid, botBid, pricePaid){
+      const earn = winner==='You' ? (VALUE - pricePaid) : 0;
+      rounds.push({n:rounds.length+1,myBid,botBid,winner,pricePaid,earn});
+      renderTableAndStats();
+      stop();
+    }
+
+    function playerBid(){
+      if(!running) return;
+      if(price===botThreshold){
+        if(Math.random()<0.5){
+          finishRound('Bot', null, botThreshold, botThreshold);
+          return;
+        }
+      }
+      finishRound('You', price, (price>botThreshold?botThreshold:null), price);
+    }
+
+    function tick(){
+      if(price<=0){
+        finishRound('Bot', null, 0, 0);
+        return;
+      }
+      price -= 1;
+      updateClock();
+      if(price===botThreshold && running){
+        finishRound('Bot', null, botThreshold, botThreshold);
+      }
+    }
+
+    function renderTableAndStats(){
+      const n = rounds.length;
+      const wins = rounds.reduce((a,r)=>a+(r.winner==='You'?1:0),0);
+      const total = rounds.reduce((a,r)=>a+r.earn,0);
+      const avg = n? total/n : 0;
+      sRounds.textContent = n;
+      sWins.textContent = wins;
+      sTotal.textContent = money0(total);
+      sAvg.textContent = money0(avg);
+
+      tbody.innerHTML = '';
+      for(const r of rounds){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.n}</td><td>${r.myBid==null?'—':money0(r.myBid)}</td><td>${r.botBid==null?'—':money0(r.botBid)}</td><td class="${r.winner==='You'?'win':'lose'}">${r.winner}</td><td>${money0(r.pricePaid)}</td><td>${money0(r.earn)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    btnStart.addEventListener('click',start);
+    btnBid.addEventListener('click',playerBid);
+    btnStop.addEventListener('click',stop);
+    btnReset.addEventListener('click',()=>{ rounds=[]; renderTableAndStats(); stop(); updateClock(); });
+
+    updateClock();
+    renderTableAndStats();
+  </script>
+</body>
+</html>
