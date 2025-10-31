@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>First-Price Sealed-Bid Auction — Practice Game</title>
+  <title>First-Price Sealed-Bid Auction</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -66,7 +66,7 @@
 <body>
   <div class="container">
     <h1>First‑Price Sealed‑Bid Auction — Practice Game</h1>
-    <div class="subtitle">Your private value is fixed at <b>$10.00</b>. You bid against one opponent whose bid is drawn uniformly from <b>$0</b> to <b>$10</b> each round. If you win, you pay your bid and earn <b>$10 − your bid</b>; otherwise, you earn <b>$0</b>. (Ties are broken at random.)</div>
+    <div class="subtitle">Your private value is fixed at <b>$10.00</b>. You bid against <span id="bots-copy">one opponent</span> whose bids are drawn uniformly from <b>$0</b> to <b>$10</b> each round. If you win, you pay your bid and earn <b>$10 − your bid</b>; otherwise, you earn <b>$0</b>. (Ties are broken at random.)</div>
 
     <div class="grid">
       <section class="card">
@@ -95,6 +95,15 @@
             <button id="reset">Reset</button>
             <span class="tiny">Tip: press <b>Enter</b> to submit.</span>
           </div>
+
+          <!-- NEW: bots slider at the very bottom -->
+          <div class="controls" style="margin-top:16px">
+            <div class="stack">
+              <label>Number of bots: <span id="bots-label" class="pill">1</span></label>
+              <input id="bots-slider" type="range" min="1" max="10" value="1" step="1" />
+            </div>
+          </div>
+
           <p class="note">This exercise is for Managerial Economics at UCLA Anderson's School of Management.</p>
         </div>
       </section>
@@ -123,6 +132,9 @@
     const VALUE = 10.0;
     const bidInput = document.getElementById('bid');
     const bidSlider = document.getElementById('bid-slider');
+    const botsSlider = document.getElementById('bots-slider');
+    const botsLabel = document.getElementById('bots-label');
+    const botsCopy = document.getElementById('bots-copy');
     const tbody = document.getElementById('tbody');
     const sRounds = document.getElementById('s-rounds');
     const sWins = document.getElementById('s-wins');
@@ -133,7 +145,12 @@
 
     const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
     const money = (x) => `$${Number(x).toFixed(2)}`;
-    const rndOppBid = () => Math.random() * 10;
+
+    function rndMaxOppBid(numBots){
+      let m = 0;
+      for (let i=0;i<numBots;i++) m = Math.max(m, Math.random()*10);
+      return m;
+    }
 
     function setFromSlider(val) {
       const b = (Number(val) / 1000) * 10;
@@ -148,12 +165,25 @@
     bidInput.addEventListener('input', (e) => setFromInput(e.target.value));
     setFromInput(10.00);
 
+    function updateBotsUI(){
+      const n = Number(botsSlider.value);
+      botsLabel.textContent = n;
+      botsCopy.textContent = n===1 ? 'one opponent' : `${n} opponents`;
+    }
+    botsSlider.addEventListener('input', updateBotsUI);
+    updateBotsUI();
+
     function playOneRound(withBid) {
       const myBid = clamp(Number(withBid), 0, 10);
-      const oppBid = rndOppBid();
+      const numBots = Number(botsSlider.value);
+      const oppBid = rndMaxOppBid(numBots);
+
       let win = false;
       if (myBid > oppBid) win = true;
-      else if (Math.abs(myBid - oppBid) < 1e-9) win = Math.random() < 0.5;
+      else if (Math.abs(myBid - oppBid) < 1e-9) {
+        // If exactly tied with the top opponent bid (rare in continuous), coin flip
+        win = Math.random() < 0.5;
+      }
       const earn = win ? (VALUE - myBid) : 0;
 
       const row = { n: rounds.length + 1, myBid, oppBid, win, earn };
@@ -161,15 +191,8 @@
       render();
     }
 
-    function undo() {
-      rounds.pop();
-      render();
-    }
-
-    function resetAll() {
-      rounds = [];
-      render();
-    }
+    function undo() { rounds.pop(); render(); }
+    function resetAll() { rounds = []; render(); }
 
     function render() {
       const n = rounds.length;
