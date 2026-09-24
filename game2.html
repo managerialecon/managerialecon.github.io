@@ -72,8 +72,8 @@
           <div class="controls">
             <div>
               <label for="price">Price</label>
-              <input id="price" type="number" inputmode="decimal" step="1" min="0" max="400" placeholder="e.g., 200" />
-              <input id="price-slider" type="range" min="0" max="400" step="1" />
+              <input id="price" type="number" inputmode="decimal" step="1" min="0" max="500" placeholder="0" />
+              <input id="price-slider" type="range" min="0" max="500" step="1" />
             </div>
             <div>
               <button id="submit" class="primary">Set Price for Day 1</button>
@@ -143,7 +143,7 @@
 
   <script>
     const MAX_DAYS = 10;
-    const P_MAX = 400;
+    const P_MAX = 500;
     const SHOCK_COMPONENT_LIMIT = 75;
     const QUANTITY_CHART_MAX = 1800;
     const PROFIT_CHART_MAX = 210000;
@@ -241,7 +241,7 @@
 
     function resetAll() {
       rounds = [];
-      setFromInput(200);
+      setFromInput(0);
       render();
     }
 
@@ -285,7 +285,7 @@
       const plotWidth = width - left - right;
       const panelHeight = (height - top - bottom - 2 * gap) / 3;
       const series = [
-        { key: 'P', label: 'Price', max: P_MAX, color: '#22c55e', maxLabel: '$400' },
+        { key: 'P', label: 'Price', max: P_MAX, color: '#22c55e', maxLabel: `$${P_MAX}` },
         { key: 'Q', label: 'Quantity', max: QUANTITY_CHART_MAX, color: '#38bdf8', maxLabel: '1,800' },
         { key: 'Pi', label: 'Profit', max: PROFIT_CHART_MAX, color: '#f59e0b', maxLabel: '$210k' }
       ];
@@ -545,7 +545,7 @@
       resizeTimer = window.setTimeout(renderCharts, 80);
     });
 
-    setFromInput(200);
+    setFromInput(0);
     render();
   </script>
 </body>
